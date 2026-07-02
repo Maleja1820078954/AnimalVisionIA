@@ -6,9 +6,10 @@ import time
 import threading
 
 # Importamos módulos (asegúrate de que todos estos estén en la carpeta 'backend')
-from camara import Camara
-from detector import DetectorAnimal
-from sonidos import ControladorSonido
+# En backend/app.py
+from backend.camara import Camara
+from backend.detector import DetectorAnimal
+from backend.sonidos import ControladorSonido
 
 app = FastAPI(title="AnimalVision AI - API de Backend")
 
