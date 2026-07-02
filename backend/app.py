@@ -9,8 +9,13 @@ import threading
 from camara import Camara
 from detector import DetectorAnimal
 from sonidos import ControladorSonido
+from fastapi.responses import FileResponse
 
 app = FastAPI(title="AnimalVision AI - API de Backend")
+
+@app.get("/")
+async def root():
+    return FileResponse("frontend/index.html")
 
 # Permitir que el Frontend web se conecte sin bloqueos de seguridad (CORS)
 app.add_middleware(
