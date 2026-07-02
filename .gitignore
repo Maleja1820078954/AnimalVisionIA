@@ -1,0 +1,17 @@
+# Entorno virtual
+venv/
+env/
+ENV/
+
+# Archivos de caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Carpetas de caché específicas de tu estructura
+backend/__pycache__/
+
+# Otros archivos útiles a ignorar
+.DS_Store
+.vscode/

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AnimalVision AI - Dashboard de Monitoreo</title>
+    <style>
+      /* --- ESTILOS CSS INCRUSTADOS PARA EVITAR ERRORES DE RUTA --- */
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #121212;
+        color: #ffffff;
+        overflow-hidden: hidden;
+      }
+
+      /* BARRA SUPERIOR (HEADER) */
+      .main-header {
+        background-color: #1e1e1e;
+        padding: 15px 30px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        border-bottom: 1px solid #25252a;
+      }
+
+      .main-header h1 {
+        color: #4caf50;
+        margin: 0;
+        font-size: 24px;
+        letter-spacing: 1px;
+      }
+
+      .main-header p {
+        color: #888888;
+        margin: 0;
+        font-size: 14px;
+        font-style: italic;
+      }
+
+      /* CONTENEDOR PRINCIPAL DÚO */
+      .dashboard-container {
+        display: flex;
+        padding: 20px;
+        gap: 20px;
+        height: calc(100vh - 110px);
+        box-sizing: border-box;
+      }
+
+      /* LADO IZQUIERDO: SEÑAL DE VIDEO Y MÉTRICAS */
+      .left-panel {
+        flex: 1.6;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .kpi-cards {
+        display: flex;
+        gap: 15px;
+      }
+
+      .card {
+        background-color: #1e1e1e;
+        flex: 1;
+        padding: 12px 20px;
+        border-radius: 6px;
+        border: 1px solid #25252a;
+      }
+
+      .card h3 {
+        margin: 0;
+        font-size: 11px;
+        color: #888888;
+        letter-spacing: 0.5px;
+      }
+
+      .card p {
+        margin: 5px 0 0 0;
+        font-size: 20px;
+        font-weight: bold;
+        color: #e0e0e0;
+      }
+
+      .video-screen {
+        background-color: #1e1e1e;
+        flex: 1;
+        border-radius: 6px;
+        border: 1px solid #25252a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+      }
+
+      #video-stream {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 4px;
+      }
+
+      .placeholder-text {
+        color: #666666;
+        font-size: 14px;
+        text-align: center;
+        line-height: 1.6;
+        position: absolute;
+      }
+
+      /* LADO DERECHO: CONTROLES Y ADVERTENCIAS */
+      .right-panel {
+        flex: 0.7;
+        background-color: #1e1e1e;
+        padding: 25px;
+        border-radius: 6px;
+        border: 1px solid #25252a;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .right-panel h2 {
+        font-size: 14px;
+        color: #e0e0e0;
+        margin-top: 0;
+        margin-bottom: 15px;
+        letter-spacing: 0.5px;
+      }
+
+      /* BOTONES INTERACTIVOS */
+      .btn {
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 14px;
+        cursor: pointer;
+        margin-bottom: 12px;
+        transition: background 0.2s ease;
+      }
+
+      .btn-start {
+        background-color: #4caf50;
+        color: white;
+      }
+      .btn-start:hover {
+        background-color: #45a049;
+      }
+
+      .btn-stop {
+        background-color: #e53935;
+        color: white;
+      }
+      .btn-stop:hover {
+        background-color: #d32f2f;
+      }
+
+      .btn:disabled {
+        background-color: #2d2d2d;
+        color: #555555;
+        cursor: not-allowed;
+      }
+
+      .divider {
+        border: 0;
+        height: 1px;
+        background-color: #333333;
+        margin: 20px 0;
+      }
+
+      /* GRILLA DE ESPECIES */
+      .species-container {
+        background-color: #151515;
+        padding: 15px;
+        border-radius: 4px;
+        flex: 1;
+      }
+
+      .species-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        color: #aaaaaa;
+        font-size: 13px;
+      }
+
+      .species-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="main-header">
+      <h1>ANIMALVISION AI</h1>
+      <p>Monitoreo de Fauna en Tiempo Real</p>
+    </header>
+
+    <div class="dashboard-container">
+      <main class="left-panel">
+        <div class="kpi-cards">
+          <div class="card">
+            <h3>ÚLTIMO OBJETIVO DETECTADO</h3>
+            <p id="kpi-animal">Ninguno</p>
+          </div>
+          <div class="card">
+            <h3>TIEMPO DE ACTIVIDAD</h3>
+            <p id="kpi-tiempo">00:00:00</p>
+          </div>
+        </div>
+
+        <div class="video-screen">
+          <div id="placeholder-msg" class="placeholder-text">
+            SISTEMA FUERA DE LÍNEA<br /><br />Presione 'Iniciar Monitoreo' para
+            encender la IA
+          </div>
+          <img id="video-stream" src="" alt="" />
+        </div>
+      </main>
+
+      <aside class="right-panel">
+        <h2>CONTROLES DE SISTEMA</h2>
+        <button id="btn-iniciar" class="btn btn-start">
+          ▶ Iniciar Monitoreo
+        </button>
+        <button id="btn-detener" class="btn btn-stop" disabled>
+          ■ Detener Sistema
+        </button>
+
+        <hr class="divider" />
+
+        <h2>ESPECIES OBJETIVO (YOLOv8)</h2>
+        <div class="species-container">
+          <div class="species-grid">
+            <div class="species-item">✓ Perro</div>
+            <div class="species-item">✓ Gato</div>
+            <div class="species-item">✓ Vaca</div>
+            <div class="species-item">✓ Oveja</div>
+            <div class="species-item">✓ Caballo</div>
+            <div class="species-item">✓ Elefante</div>
+            <div class="species-item">✓ Oso</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <script>
+      const API_URL = "http://localhost:8000/api";
+      let intervalId = null;
+
+      document
+        .getElementById("btn-iniciar")
+        .addEventListener("click", async () => {
+          try {
+            const res = await fetch(`${API_URL}/encender`);
+            const data = await res.json();
+            if (data.status === "success" || data.status === "info") {
+              document.getElementById("btn-iniciar").disabled = true;
+              document.getElementById("btn-detener").disabled = false;
+              document.getElementById("placeholder-msg").style.display = "none";
+              document.getElementById("video-stream").src =
+                `${API_URL}/video_feed`;
+
+              intervalId = setInterval(actualizarMetricas, 1000);
+            }
+          } catch (err) {
+            alert(
+              "No se pudo conectar con el Backend. Asegúrate de tener uvicorn encendido.",
+            );
+          }
+        });
+
+      document
+        .getElementById("btn-detener")
+        .addEventListener("click", async () => {
+          await fetch(`${API_URL}/apagar`);
+          document.getElementById("btn-iniciar").disabled = false;
+          document.getElementById("btn-detener").disabled = true;
+          document.getElementById("video-stream").src = "";
+          document.getElementById("placeholder-msg").style.display = "block";
+          document.getElementById("kpi-animal").innerText = "Ninguno";
+          document.getElementById("kpi-tiempo").innerText = "00:00:00";
+          clearInterval(intervalId);
+        });
+
+      async function actualizarMetricas() {
+        try {
+          const res = await fetch(`${API_URL}/estado`);
+          const data = await res.json();
+          if (data.activo) {
+            document.getElementById("kpi-animal").innerText =
+              data.ultimo_animal;
+            if (data.confianza > 0) {
+              document.getElementById("kpi-animal").innerText +=
+                ` (${data.confianza}%)`;
+            }
+            document.getElementById("kpi-tiempo").innerText =
+              data.tiempo_actividad;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    </script>
+  </body>
+</html>
