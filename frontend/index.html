@@ -267,19 +267,26 @@
       let tiempoInicio = null;
       let sistemaActivo = false;
 
-      // --- Lógica de cooldown de audio (la que ya armaste) ---
+      // --- Lógica de cooldown de audio ---
       let ultimoAnimalDetectado = null;
       let tiempoUltimaAlerta = 0;
-      const INTERVALO_COOLDOWN_MS = 4000; // 4 segundos, igual que tu backend original
+      const INTERVALO_COOLDOWN_MS = 4000; // 4 segundos, igual que el backend original
 
       function evaluarSonido(animal) {
         const ahora = Date.now();
         const cambioDeAnimal = animal !== ultimoAnimalDetectado;
-        const paseCooldown = (ahora - tiempoUltimaAlerta) > INTERVALO_COOLDOWN_MS;
+        const paseCooldown = ahora - tiempoUltimaAlerta > INTERVALO_COOLDOWN_MS;
 
-        if (animal && (cambioDeAnimal || (animal === ultimoAnimalDetectado && paseCooldown))) {
+        if (
+          animal &&
+          (cambioDeAnimal || (animal === ultimoAnimalDetectado && paseCooldown))
+        ) {
           const audio = new Audio(`/sonidos/${animal.toLowerCase()}.mp3`);
-          audio.play().catch(e => console.log("Esperando interacción del usuario: " + e));
+          audio
+            .play()
+            .catch((e) =>
+              console.log("Esperando interacción del usuario: " + e),
+            );
           ultimoAnimalDetectado = animal;
           tiempoUltimaAlerta = ahora;
         }
@@ -289,4 +296,126 @@
         }
       }
 
-      // --- Iniciar: pide permiso de cámara al navegador y
+      // --- Iniciar: pide permiso de cámara al navegador y arranca el loop ---
+      document
+        .getElementById("btn-iniciar")
+        .addEventListener("click", async () => {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+
+            await new Promise((resolve) => {
+              video.onloadedmetadata = () => resolve();
+            });
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            document.getElementById("btn-iniciar").disabled = true;
+            document.getElementById("btn-detener").disabled = false;
+            document.getElementById("placeholder-msg").style.display = "none";
+            document.getElementById("error-msg").innerText = "";
+
+            sistemaActivo = true;
+            tiempoInicio = Date.now();
+
+            intervalId = setInterval(capturarYEnviarFrame, 700); // ~1.4 frames/seg, suficiente para detección + fluido
+          } catch (err) {
+            document.getElementById("error-msg").innerText =
+              "No se pudo acceder a la cámara. Verifica los permisos del navegador.";
+            console.error(err);
+          }
+        });
+
+      // --- Detener: libera la cámara y limpia el estado ---
+      document.getElementById("btn-detener").addEventListener("click", () => {
+        sistemaActivo = false;
+        clearInterval(intervalId);
+
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+          stream = null;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById("btn-iniciar").disabled = false;
+        document.getElementById("btn-detener").disabled = true;
+        document.getElementById("placeholder-msg").style.display = "block";
+        document.getElementById("kpi-animal").innerText = "Ninguno";
+        document.getElementById("kpi-tiempo").innerText = "00:00:00";
+        ultimoAnimalDetectado = null;
+      });
+
+      // --- Loop principal: captura un frame, lo manda al backend, dibuja el resultado ---
+      async function capturarYEnviarFrame() {
+        if (!sistemaActivo) return;
+
+        // 1. Dibujar el frame actual de la cámara en el canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // 2. Convertir ese frame a un blob JPEG para mandarlo por la red
+        canvas.toBlob(
+          async (blob) => {
+            if (!blob) return;
+
+            const formData = new FormData();
+            formData.append("imagen", blob, "frame.jpg");
+
+            try {
+              const res = await fetch(`${API_URL}/detectar`, {
+                method: "POST",
+                body: formData,
+              });
+              const data = await res.json();
+
+              if (data.status === "success") {
+                // Redibujar el frame limpio antes de poner el recuadro nuevo
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                if (data.animal && data.bbox) {
+                  const [x1, y1, x2, y2] = data.bbox;
+                  ctx.strokeStyle = "#4CAF50";
+                  ctx.lineWidth = 3;
+                  ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+                  ctx.fillStyle = "#4CAF50";
+                  ctx.font = "16px Segoe UI";
+                  ctx.fillText(
+                    `${data.animal.toUpperCase()} ${data.confianza}%`,
+                    x1,
+                    y1 > 20 ? y1 - 8 : y1 + 20,
+                  );
+
+                  document.getElementById("kpi-animal").innerText =
+                    `${data.animal.toUpperCase()} (${data.confianza}%)`;
+
+                  evaluarSonido(data.animal);
+                } else {
+                  document.getElementById("kpi-animal").innerText = "Ninguno";
+                  evaluarSonido(null);
+                }
+              }
+            } catch (err) {
+              console.error("Error al consultar /api/detectar:", err);
+            }
+
+            // 3. Actualizar el cronómetro de tiempo de actividad
+            if (tiempoInicio) {
+              const segundos = Math.floor((Date.now() - tiempoInicio) / 1000);
+              const h = String(Math.floor(segundos / 3600)).padStart(2, "0");
+              const m = String(Math.floor((segundos % 3600) / 60)).padStart(
+                2,
+                "0",
+              );
+              const s = String(segundos % 60).padStart(2, "0");
+              document.getElementById("kpi-tiempo").innerText =
+                `${h}:${m}:${s}`;
+            }
+          },
+          "image/jpeg",
+          0.8,
+        );
+      }
+    </script>
+  </body>
+</html>

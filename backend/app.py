@@ -16,9 +16,11 @@ SONIDOS_DIR = os.path.join(BASE_DIR, "sonidos")
 
 app.mount("/sonidos", StaticFiles(directory=SONIDOS_DIR), name="sonidos")
 
+
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
 
 app.add_middleware(
     CORSMiddleware,
