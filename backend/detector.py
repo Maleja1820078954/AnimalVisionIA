@@ -1,7 +1,6 @@
 import torch
 import os
 from ultralytics import YOLO
-import cv2
 
 # Configuración de Seguridad para PyTorch 2.6+
 torch.serialization.add_safe_globals([
@@ -17,16 +16,16 @@ torch.serialization.add_safe_globals([
 
 class DetectorAnimal:
     """
-    Capa de Inteligencia Artificial optimizada para entornos Headless (Nube).
+    Capa de Inteligencia Artificial. Recibe un frame y devuelve datos
+    (no imagen dibujada) para que el frontend renderice el recuadro.
     """
     def __init__(self, ruta_modelo: str = "modelo/yolov8n.pt"):
-        # Construimos una ruta absoluta basada en la ubicación de este archivo
         base_dir = os.path.dirname(os.path.abspath(__file__))
         self.ruta_modelo = os.path.join(base_dir, ruta_modelo)
         self.modelo = None
-        
+
         self.clases_animales = {
-            15: "gato", 16: "perro", 17: "caballo", 
+            15: "gato", 16: "perro", 17: "caballo",
             18: "oveja", 19: "vaca", 20: "elefante", 21: "oso"
         }
 
@@ -43,15 +42,14 @@ class DetectorAnimal:
             return False
 
     def detectar(self, frame, confianza_minima: float = 0.70):
+        """
+        Devuelve (animal_detectado, confianza, bbox) en vez de una imagen.
+        bbox es [x1, y1, x2, y2] en píxeles del frame recibido, o None si no hay detección.
+        """
         if self.modelo is None:
-            return None, 0.0, frame
+            return None, 0.0, None
 
-        # Inferencia silenciosa
         resultados = self.modelo(frame, verbose=False)[0]
-        
-        animal_detectado = None
-        confianza_detectada = 0.0
-        frame_resultado = frame.copy()
 
         for box in resultados.boxes:
             cls_id = int(box.cls[0])
@@ -59,17 +57,7 @@ class DetectorAnimal:
 
             if cls_id in self.clases_animales and conf >= confianza_minima:
                 animal_detectado = self.clases_animales[cls_id]
-                confianza_detectada = conf
-                
-                # Coordenadas
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-                
-                # Dibujar sin abrir ventanas
-                cv2.rectangle(frame_resultado, (x1, y1), (x2, y2), (76, 175, 80), 3)
-                etiqueta = f"{animal_detectado.upper()} {conf*100:.1f}%"
-                cv2.putText(frame_resultado, etiqueta, (x1, y1 - 10), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (76, 175, 80), 2, cv2.LINE_AA)
-                break 
+                return animal_detectado, conf, [x1, y1, x2, y2]
 
-        return animal_detectado, confianza_detectada, frame_resultado
-
+        return None, 0.0, None

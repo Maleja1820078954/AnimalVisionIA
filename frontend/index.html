@@ -5,16 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AnimalVision AI - Dashboard de Monitoreo</title>
     <style>
-      /* --- ESTILOS CSS INCRUSTADOS PARA EVITAR ERRORES DE RUTA --- */
       body {
         margin: 0;
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         background-color: #121212;
         color: #ffffff;
-        overflow-hidden: hidden;
+        overflow: hidden;
       }
 
-      /* BARRA SUPERIOR (HEADER) */
       .main-header {
         background-color: #1e1e1e;
         padding: 15px 30px;
@@ -38,7 +36,6 @@
         font-style: italic;
       }
 
-      /* CONTENEDOR PRINCIPAL DÚO */
       .dashboard-container {
         display: flex;
         padding: 20px;
@@ -47,7 +44,6 @@
         box-sizing: border-box;
       }
 
-      /* LADO IZQUIERDO: SEÑAL DE VIDEO Y MÉTRICAS */
       .left-panel {
         flex: 1.6;
         display: flex;
@@ -93,10 +89,17 @@
         position: relative;
       }
 
-      #video-stream {
+      /* El <video> real de la cámara y el <canvas> donde dibujamos van superpuestos */
+      #video-elemento,
+      #canvas-overlay {
         max-width: 100%;
         max-height: 100%;
         border-radius: 4px;
+        position: absolute;
+      }
+
+      #video-elemento {
+        display: none; /* la cámara se captura aquí pero no se muestra directamente */
       }
 
       .placeholder-text {
@@ -107,7 +110,6 @@
         position: absolute;
       }
 
-      /* LADO DERECHO: CONTROLES Y ADVERTENCIAS */
       .right-panel {
         flex: 0.7;
         background-color: #1e1e1e;
@@ -126,7 +128,6 @@
         letter-spacing: 0.5px;
       }
 
-      /* BOTONES INTERACTIVOS */
       .btn {
         width: 100%;
         padding: 14px;
@@ -168,7 +169,6 @@
         margin: 20px 0;
       }
 
-      /* GRILLA DE ESPECIES */
       .species-container {
         background-color: #151515;
         padding: 15px;
@@ -188,6 +188,12 @@
         display: flex;
         align-items: center;
         gap: 8px;
+      }
+
+      .error-msg {
+        color: #e57373;
+        font-size: 12px;
+        margin-top: 10px;
       }
     </style>
   </head>
@@ -213,9 +219,12 @@
         <div class="video-screen">
           <div id="placeholder-msg" class="placeholder-text">
             SISTEMA FUERA DE LÍNEA<br /><br />Presione 'Iniciar Monitoreo' para
-            encender la IA
+            encender la cámara
           </div>
-          <img id="video-stream" src="" alt="" />
+          <!-- Aquí llega el stream real de la cámara del navegador -->
+          <video id="video-elemento" autoplay playsinline muted></video>
+          <!-- Aquí dibujamos el frame + el recuadro del animal detectado -->
+          <canvas id="canvas-overlay"></canvas>
         </div>
       </main>
 
@@ -227,6 +236,7 @@
         <button id="btn-detener" class="btn btn-stop" disabled>
           ■ Detener Sistema
         </button>
+        <p id="error-msg" class="error-msg"></p>
 
         <hr class="divider" />
 
@@ -247,69 +257,36 @@
 
     <script>
       const API_URL = "/api";
+
+      const video = document.getElementById("video-elemento");
+      const canvas = document.getElementById("canvas-overlay");
+      const ctx = canvas.getContext("2d");
+
+      let stream = null;
       let intervalId = null;
-      // Variable para controlar la última detección y evitar repetir sonidos
-      let ultimaDeteccion = "Ninguno"; 
+      let tiempoInicio = null;
+      let sistemaActivo = false;
 
-      document
-        .getElementById("btn-iniciar")
-        .addEventListener("click", async () => {
-          try {
-            const res = await fetch(`${API_URL}/encender`);
-            const data = await res.json();
-            if (data.status === "success" || data.status === "info") {
-              document.getElementById("btn-iniciar").disabled = true;
-              document.getElementById("btn-detener").disabled = false;
-              document.getElementById("placeholder-msg").style.display = "none";
-              document.getElementById("video-stream").src = `${API_URL}/video_feed`;
+      // --- Lógica de cooldown de audio (la que ya armaste) ---
+      let ultimoAnimalDetectado = null;
+      let tiempoUltimaAlerta = 0;
+      const INTERVALO_COOLDOWN_MS = 4000; // 4 segundos, igual que tu backend original
 
-              intervalId = setInterval(actualizarMetricas, 1000);
-            }
-          } catch (err) {
-            alert("No se pudo conectar con el Backend. Asegúrate de tener uvicorn encendido.");
-          }
-        });
+      function evaluarSonido(animal) {
+        const ahora = Date.now();
+        const cambioDeAnimal = animal !== ultimoAnimalDetectado;
+        const paseCooldown = (ahora - tiempoUltimaAlerta) > INTERVALO_COOLDOWN_MS;
 
-      document
-        .getElementById("btn-detener")
-        .addEventListener("click", async () => {
-          await fetch(`${API_URL}/apagar`);
-          document.getElementById("btn-iniciar").disabled = false;
-          document.getElementById("btn-detener").disabled = true;
-          document.getElementById("video-stream").src = "";
-          document.getElementById("placeholder-msg").style.display = "block";
-          document.getElementById("kpi-animal").innerText = "Ninguno";
-          document.getElementById("kpi-tiempo").innerText = "00:00:00";
-          ultimaDeteccion = "Ninguno"; // Reiniciamos el estado del audio
-          clearInterval(intervalId);
-        });
+        if (animal && (cambioDeAnimal || (animal === ultimoAnimalDetectado && paseCooldown))) {
+          const audio = new Audio(`/sonidos/${animal.toLowerCase()}.mp3`);
+          audio.play().catch(e => console.log("Esperando interacción del usuario: " + e));
+          ultimoAnimalDetectado = animal;
+          tiempoUltimaAlerta = ahora;
+        }
 
-      async function actualizarMetricas() {
-        try {
-          const res = await fetch(`${API_URL}/estado`);
-          const data = await res.json();
-          if (data.activo) {
-            document.getElementById("kpi-animal").innerText = data.ultimo_animal;
-            
-            // --- Lógica de Audio Integrada ---
-            if (data.ultimo_animal !== "Ninguno" && data.ultimo_animal !== ultimaDeteccion) {
-              ultimaDeteccion = data.ultimo_animal; 
-              // Se buscará el archivo en /sonidos/nombre.mp3
-              const audio = new Audio(`/sonidos/${data.ultimo_animal.toLowerCase()}.mp3`);
-              audio.play().catch(e => console.log("Esperando interacción del usuario: " + e));
-            } else if (data.ultimo_animal === "Ninguno") {
-              ultimaDeteccion = "Ninguno";
-            }
-
-            if (data.confianza > 0) {
-              document.getElementById("kpi-animal").innerText += ` (${data.confianza}%)`;
-            }
-            document.getElementById("kpi-tiempo").innerText = data.tiempo_actividad;
-          }
-        } catch (e) {
-          console.error(e);
+        if (!animal) {
+          ultimoAnimalDetectado = null;
         }
       }
-    </script>
-  </body>
-</html>
+
+      // --- Iniciar: pide permiso de cámara al navegador y
