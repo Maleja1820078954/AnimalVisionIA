@@ -10,7 +10,7 @@ class Camara:
         self.indice_camara = indice_camara
         self.captura = None
         # Detectamos si estamos en un entorno de servidor (Render)
-        self.es_entorno_nube = os.environ.get("RENDER") is not None
+        self.es_entorno_nube = os.environ.get("RAILWAY_ENVIRONMENT") is not None
 
     def conectar(self) -> bool:
         """

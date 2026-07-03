@@ -248,6 +248,8 @@
     <script>
       const API_URL = "/api";
       let intervalId = null;
+      // Variable para controlar la última detección y evitar repetir sonidos
+      let ultimaDeteccion = "Ninguno"; 
 
       document
         .getElementById("btn-iniciar")
@@ -259,15 +261,12 @@
               document.getElementById("btn-iniciar").disabled = true;
               document.getElementById("btn-detener").disabled = false;
               document.getElementById("placeholder-msg").style.display = "none";
-              document.getElementById("video-stream").src =
-                `${API_URL}/video_feed`;
+              document.getElementById("video-stream").src = `${API_URL}/video_feed`;
 
               intervalId = setInterval(actualizarMetricas, 1000);
             }
           } catch (err) {
-            alert(
-              "No se pudo conectar con el Backend. Asegúrate de tener uvicorn encendido.",
-            );
+            alert("No se pudo conectar con el Backend. Asegúrate de tener uvicorn encendido.");
           }
         });
 
@@ -281,6 +280,7 @@
           document.getElementById("placeholder-msg").style.display = "block";
           document.getElementById("kpi-animal").innerText = "Ninguno";
           document.getElementById("kpi-tiempo").innerText = "00:00:00";
+          ultimaDeteccion = "Ninguno"; // Reiniciamos el estado del audio
           clearInterval(intervalId);
         });
 
@@ -289,14 +289,22 @@
           const res = await fetch(`${API_URL}/estado`);
           const data = await res.json();
           if (data.activo) {
-            document.getElementById("kpi-animal").innerText =
-              data.ultimo_animal;
-            if (data.confianza > 0) {
-              document.getElementById("kpi-animal").innerText +=
-                ` (${data.confianza}%)`;
+            document.getElementById("kpi-animal").innerText = data.ultimo_animal;
+            
+            // --- Lógica de Audio Integrada ---
+            if (data.ultimo_animal !== "Ninguno" && data.ultimo_animal !== ultimaDeteccion) {
+              ultimaDeteccion = data.ultimo_animal; 
+              // Se buscará el archivo en /sonidos/nombre.mp3
+              const audio = new Audio(`/sonidos/${data.ultimo_animal.toLowerCase()}.mp3`);
+              audio.play().catch(e => console.log("Esperando interacción del usuario: " + e));
+            } else if (data.ultimo_animal === "Ninguno") {
+              ultimaDeteccion = "Ninguno";
             }
-            document.getElementById("kpi-tiempo").innerText =
-              data.tiempo_actividad;
+
+            if (data.confianza > 0) {
+              document.getElementById("kpi-animal").innerText += ` (${data.confianza}%)`;
+            }
+            document.getElementById("kpi-tiempo").innerText = data.tiempo_actividad;
           }
         } catch (e) {
           console.error(e);

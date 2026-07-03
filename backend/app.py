@@ -10,8 +10,11 @@ import threading
 from backend.camara import Camara
 from backend.detector import DetectorAnimal
 from backend.sonidos import ControladorSonido
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="AnimalVision AI - API de Backend")
+
+app.mount("/sonidos", StaticFiles(directory="sonidos"), name="sonidos")
 
 @app.get("/")
 async def root():
